@@ -1,45 +1,57 @@
 import os
+import sys
 import logging
+import asyncio
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 
-# 1. Enable logging to see bot activity and errors in the Render logs
+# 1. Setup logging so we can see what's happening in the Render logs
 logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', 
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
-# 2. Define the /start command handler
-async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Sends a welcome message when the user issues the /start command."""
+# 2. This is the function that runs when someone types /start
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info("Received /start command from a user!")
+    
     welcome_text = (
         "👋 Welcome to Friendly Chat!\n"
         "Start a friendly conversation, ask questions, and chat anytime.\n"
         "Have a great day! 😊"
     )
-    # Reply directly to the user who sent the command
+    
     await update.message.reply_text(welcome_text)
 
-# 3. Main function to start the bot
-def main() -> None:
-    """Start the bot."""
-    # Retrieve the bot token from Render's environment variables
-    bot_token = os.environ.get("BOT_TOKEN")
+# 3. The main engine that boots up the bot
+async def main():
+    # Grab the token from Render's environment variables
+    token = os.environ.get("BOT_TOKEN")
     
-    if not bot_token:
-        logger.error("Critical Error: BOT_TOKEN environment variable not found!")
-        return
+    if not token:
+        logger.error("ERROR: BOT_TOKEN variable is missing in Render settings!")
+        sys.exit(1)
 
-    # Create the Application and pass it your bot's token
-    application = Application.builder().token(bot_token).build()
+    logger.info("Initializing bot application...")
+    # Build the bot
+    app = Application.builder().token(token).build()
 
-    # Register the /start command handler
-    application.add_handler(CommandHandler("start", start_command))
+    # Link the /start command to our function
+    app.add_handler(CommandHandler("start", start_command))
 
-    # Run the bot using polling mode (perfect for Background Workers)
-    logger.info("Friendly Chat Bot is starting polling...")
-    application.run_polling()
+    # Start listening to Telegram
+    logger.info("Friendly Chat Bot is now ONLINE and listening for messages... 🎉")
+    
+    # This keeps the bot running forever in the background
+    await app.initialize()
+    await app.start()
+    await app.updater.start_polling()
+    
+    # Keep running until Render stops the script
+    while True:
+        await asyncio.sleep(3600)
 
-if __name__ == '__main__':
-    main()
+if __name__ == "__main__":
+    # This forces Python to run the async loop safely from the beginning
+    asyncio.run(main())
